@@ -1,0 +1,13 @@
+{
+  "include-v-in-tag": true,
+  "changelog-sections": [
+    { "type": "build", "section": "Build System", "hidden": false },
+    { "type": "chore", "section": "Chores", "hidden": false },
+    { "type": "ci", "section": "CI", "hidden": false },
+    { "type": "docs", "section": "Documentation", "hidden": false },
+    { "type": "feat", "section": "Features", "hidden": false },
+    { "type": "fix", "section": "Bug Fixes", "hidden": false },
+    { "type": "refactor", "section": "Refactoring", "hidden": false },
+    { "type": "test", "section": "Tests", "hidden": false }
+  ]
+}
