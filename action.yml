@@ -92,21 +92,20 @@ runs:
     - name: Get deployment url
       id: url
       shell: bash
+      env:
+        PAGES_URL: ${{ steps.deploy.outputs.deployment-url }}
       run: |
-        PAGES_URL="${{ steps.deploy.outputs.deployment-url }}"
-        DEPLOYMENT_URL=""
-
-        # Check if custom domains are provided
         if [ -n "${{ inputs.custom-domains }}" ]; then
-          # Process the custom domains
-          DEPLOYMENT_URL=$(echo "${{ inputs.custom-domains }}" | tr ',' '\n' | xargs -I {} echo "https://{}" | tr '\n' ', ' | sed 's/, $//')
+          CUSTOM_DOMAIN_URL=$(echo "${{ inputs.custom-domains }}" | tr ',' '\n' | xargs -I {} echo "https://{}" | tr '\n' ', ' | sed 's/, $//')
         fi
 
-        # If DEPLOYMENT_URL is not empty, use it; otherwise, fallback to PAGES_URL
-        if [ -n "$DEPLOYMENT_URL" ]; then
-          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+        if [ -z "$CUSTOM_DOMAIN_URL" ]; then
           echo "pages-url=$PAGES_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=$CUSTOM_DOMAIN_URL" >> $GITHUB_OUTPUT
+          echo "Your deployment has been successful and can be accessed at $PAGES_URL"
+          echo "or you can also access it at $CUSTOM_DOMAIN_URL"
         else
-          echo "deployment-url=$PAGES_URL" >> $GITHUB_OUTPUT
           echo "pages-url=$PAGES_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=$PAGES_URL" >> $GITHUB_OUTPUT
+          echo "Your deployment has been successful and can be accessed at $PAGES_URL"
         fi

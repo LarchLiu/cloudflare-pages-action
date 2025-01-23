@@ -54,9 +54,10 @@ runs:
         if [ -n "$custom_domains" ]; then
           curl -s https://publicsuffix.org/list/public_suffix_list.dat -o public_suffix_list.dat
           for domain in $(echo "$custom_domains" | tr ',' '\n'); do
-            echo "======================================="
+            echo "=============================================================================="
             echo "Setup custom domain for $domain"
-            echo "======================================="
+            echo "=============================================================================="
+            echo "Get main domain ..."
             tld=""
             parts=($(echo "$domain" | tr '.' ' '))
             num_parts=${#parts[@]}
@@ -71,25 +72,27 @@ runs:
             topdomain=$(echo "${parts[$i-$tld_num_parts-1]}.${tld}")
 
             if [ -n "$topdomain" ]; then
-              echo "======================================="
-              echo "Get Zone ID from $topdomain"
-              echo "======================================="
-              response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=${topdomain}" \
+              echo "Main domain is $topdomain"
+              echo "Get cloudflare zone for $topdomain ..."
+              getzone=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=${topdomain}" \
                 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
                 -H "Content-Type: application/json")
-              zone_id=$(echo $response | jq -r '.result[0].id')
+              zone_id=$(echo $getzone | jq -r '.result[0].id')
               
               if [ -n "$zone_id" ]; then
-                res_record=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records?type=CNAME&name=${domain}" \
+                echo "Cloudflare zone is found"
+                echo "Get cloudflare dns record for $domain ..."
+                getdns=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records?type=CNAME&name=${domain}" \
                   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
                   -H "Content-Type: application/json")
-                dns_record_id=$(echo $res_record | jq -r '.result[0].id')
+                dns_record_id=$(echo $getdns | jq -r '.result[0].id')
 
-                if [ "$dns_record_id" == "null" ] || [ -z "$dns_record_id" ]; then
-                  echo "======================================="
-                  echo "Setup DNS Record for $domain"
-                  echo "======================================="
-                  response=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records" \
+                if [ -n "$dns_record_id" ]; then
+                  echo "Cloudflare dns record is found"
+                else
+                  echo "Cloudflare dns record is not found"
+                  echo "Setup dns record for $domain ..."
+                  postdns=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records" \
                     -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
                     -H "Content-Type: application/json" \
                     --data '{
@@ -99,23 +102,27 @@ runs:
                       "ttl": 1,
                       "proxied": true
                     }')
-                  dns_record_id=$(echo $response | jq -r '.result.id')
+                  dns_record_id=$(echo $postdns | jq -r '.result.id')
 
-                  echo "=================================================="
-                  echo "Setup Custom Domain $domain for $PROJECT_NAME"
-                  echo "=================================================="
-                  curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT_NAME/domains" \
-                    -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-                    -H "Content-Type: application/json" \
-                    --data '{"name": "'${domain}'"}'
+                  if [ -n "$dns_record_id" ]; then
+                    echo "Cloudflare dns record is created"
+                    echo "Setup custom domain for $PROJECT_NAME ..."
+                    postcustomdomain=$(curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT_NAME/domains" \
+                      -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+                      -H "Content-Type: application/json" \
+                      --data '{"name": "'${domain}'"}')
+                    custom_domain_id=$(echo $postcustomdomain | jq -r '.result.id')
+
+                    if [ -n "$custom_domain_id" ]; then
+                      echo "Custom domain for $PROJECT_NAME is created"
+                    fi
+                  fi
                 fi
 
                 if [ "$BRANCH" != "$PRODUCTION_BRANCH" ]; then
-                  echo "=================================================="
-                  echo "Update Deployment on $domain"
-                  echo "=================================================="
+                  echo "Update dns record for $domain ..."
                   deployment_url=$(echo "$DEPLOYMENT_URL" | sed 's/^https:\/\///')
-                  curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records/${dns_record_id}" \
+                  patchdns=$(curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records/${dns_record_id}" \
                     -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
                     -H "Content-Type: application/json" \
                     --data '{
@@ -125,7 +132,12 @@ runs:
                       "id": "'"${dns_record_id}"'",
                       "ttl": 1,
                       "proxied": true
-                    }'
+                    }')
+                  patch_dns_record_id=$(echo $patchdns | jq -r '.result.id')
+                  
+                  if [ -n "$patch_dns_record_id" ]; then
+                    echo "Cloudflare dns record is updated"
+                  fi
                 fi
               fi
             fi
