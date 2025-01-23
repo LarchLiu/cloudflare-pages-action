@@ -88,9 +88,9 @@ runs:
                 dns_record_id=$(echo $getdns | jq -r '.result[0].id')
 
                 if [ -n "$dns_record_id" ]; then
-                  echo "Cloudflare dns record is found"
+                  echo "Cloudflare dns record for $domain already exists"
                 else
-                  echo "Cloudflare dns record is not found"
+                  echo "Cloudflare dns record for $domain is not found"
                   echo "Setup dns record for $domain ..."
                   postdns=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records" \
                     -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
@@ -141,6 +141,9 @@ runs:
                 fi
               fi
             fi
+
+            echo "=============================================================================="
+            echo ""
           done
           rm public_suffix_list.dat
         fi
